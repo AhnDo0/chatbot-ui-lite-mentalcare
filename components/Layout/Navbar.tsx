@@ -8,7 +8,7 @@ export const Navbar: FC = () => {
           className="ml-2 hover:opacity-50"
           href="https://code-scaffold.vercel.app"
         >
-          Chatbot UI
+          나만의 심리상담 챗봇
         </a>
       </div>
     </div>

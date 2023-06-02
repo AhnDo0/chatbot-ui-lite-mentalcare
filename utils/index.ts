@@ -16,11 +16,11 @@ export const OpenAIStream = async (messages: Message[]) => {
       messages: [
         {
           role: "system",
-          content: `You are a helpful, friendly, assistant.`
+          content: `You are a helpful, friendly, psychotherapist. tell me in Korean.`
         },
         ...messages
       ],
-      max_tokens: 800,
+      max_tokens: 4000,
       temperature: 0.0,
       stream: true
     })
