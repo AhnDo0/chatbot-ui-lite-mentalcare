@@ -5,7 +5,6 @@ import { Message } from "@/types";
 import Head from "next/head";
 import React from "react";
 import { useEffect, useRef, useState } from "react";
-import { analyzeSentiment } from "./api/clova";
 import axios from "axios";
 import Script from "next/script";
 
@@ -20,10 +19,12 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  async function callCLOVAAPI(message: Message) {
-    const response = await axios({
+  async function callCLOVAAPI(message: string) {
+    const response = await axios(`/api/clova?query=${message}`, {
       method: "POST",
-      url: "/api/clova",
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
 
     if (response.status !== 200) {
@@ -41,76 +42,32 @@ export default function Home() {
     setMessages(updatedMessages);
     setLoading(true);
 
-    // try{
-    //   const clovaResponse = await axios.get("http://localhost:3000/api/clova", {
-    //   data: {
-    //     contents: updatedMessages,
-    //   },
-    // })
-    // .then((response) => {
-    //   console.log(response);
-    // })
-    // .catch((error) => {
-    //   console.log(error);
-    // });
-    // }catch (error) {
-    //   console.error("Error sending message to /api/clova: ", error);
-    // }
-
-
     //call calova api
-
-    // try {
-    //   //Call CLOVA API
-    //   const clovaResponse = await callCLOVAAPI(message);
-    //   const sentimentResult = `Sentiment Result: ${clovaResponse.document.sentiment}\nConfidence - Neutral: ${clovaResponse.document.confidence.neutral}%, Positive: ${clovaResponse.document.confidence.positive}%, Negative: ${clovaResponse.document.confidence.negative}%`;
-    //   setMessages([
-    //     {
-    //     role: "assistant",
-    //     content: sentimentResult,
-    //     }
-    //   ]);
-
-    //   setMessages(updatedMessages);
-    //   setLoading(false);
-    // } catch (error) {
-    //   setLoading(false);
-    //   if (error instanceof Error) {
-    //     alert(`오류 발생: ${error.message}`);
-    //   } else {
-    //     alert("알 수 없는 오류 발생");
-    //   }
-    // }
-
-    const client_id = "X-NCP-APIGW-API-KEY-ID";
-    const client_secret = "X-NCP-APIGW-API-KEY";
-    const url =
-      "https://naveropenapi.apigw.ntruss.com/sentiment-analysis/v1/analyze";
-    const headers = {
-      "X-NCP-APIGW-API-KEY-ID": client_id,
-      "X-NCP-APIGW-API-KEY": client_secret,
-      "Content-Type": "application/json",
-    };
-    const content = "싸늘하다. 가슴에 비수가 날아와 꽂힌다.";
-    const clovaData = {
-      content: content,
-    };
-
-    console.log(JSON.stringify(clovaData, null, 4));
-
-    axios
-      .post(url, clovaData, { headers })
-      .then((response) => {
-        if (response.status === 200) {
-          console.log(response.data);
-        } else {
-          console.error(`Error: ${response.status} - ${response.statusText}`);
+    try {
+      //Call CLOVA API
+      const clovaResponse = await callCLOVAAPI(message.content);
+      console.log(clovaResponse);
+      const sentimentResult = `Sentiment Result: ${clovaResponse.document.sentiment}\nConfidence - Neutral: ${clovaResponse.document.confidence.neutral}%, Positive: ${clovaResponse.document.confidence.positive}%, Negative: ${clovaResponse.document.confidence.negative}%`;
+      setMessages([
+        {
+        role: "assistant",
+        content: sentimentResult,
         }
-      })
-      .catch((error) => {
-        console.error("Error : " + error);
-      });
+      ]);
 
+      setMessages(updatedMessages);
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      if (error instanceof Error) {
+        alert(`오류 발생: ${error.message}`);
+      } else {
+        alert("알 수 없는 오류 발생");
+      }
+    }
+
+    
+    //sending message to GPT
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: {
