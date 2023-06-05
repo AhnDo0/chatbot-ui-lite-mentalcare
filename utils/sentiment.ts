@@ -5,7 +5,7 @@ import {
   ReconnectInterval,
 } from "eventsource-parser";
 
-export const OpenAIStream = async (messages: Message[]) => {
+export const SentimentOpenAIStream = async (messages: Message[]) => {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
 
@@ -16,18 +16,22 @@ export const OpenAIStream = async (messages: Message[]) => {
         role: "system",
         content: `You are a helpful, friendly, psychotherapist. tell me in Korean.`,
       },
+      {
+        role: "assistant",
+        content: "안녕하세요! 당신의 심리 파악을 도와줄 어시스턴트입니다!",
+      },
       ...messages,
     ],
     max_tokens: 1000,
     temperature: 0.0,
     stream: true,
   };
-  // console.log(`in utils: Request Body: ${JSON.stringify(body)}`);
+  console.log(`in sentiments: Request Body: ${JSON.stringify(body)}`);
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      Authorization: `Bearer ${process.env.SENTIMENT_OPENAI_API_KEY}`,
     },
     method: "POST",
     // body: JSON.stringify({
