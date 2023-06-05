@@ -14,6 +14,8 @@ export default function Home() {
   const [showStartButton, setShowStartButton] = useState<boolean>(true);
   const [totalScore, setTotalScore] = useState<number>(0);
   const [count, setCount] = useState<number>(0);
+  const [sentimentMessage, setSentimentMessage] = useState<Message[]>([]);
+  const [conclusionMessage, setConclusionMesssage] = useState<Message[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -59,7 +61,7 @@ export default function Home() {
     const response = await axios(`/api/clova?query=${message}`, {
       method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     });
 
@@ -70,8 +72,9 @@ export default function Home() {
     const data = response.data;
 
     //negative sentiment handling
-    if(data.document.sentiment === 'negative'){
+    if (data.document.sentiment === "negative") {
       const comfortMessage = await getComfortingMessage(message);
+
       return { ...data, comfortMessage };
     }
 
@@ -79,7 +82,7 @@ export default function Home() {
   }
 
   //negative sentiment handling
-  const getComfortingMessage  = async (userMessage: string) => {
+  const getComfortingMessage = async (userMessage: string) => {
     const comfortPrompts = `사람을 위로하는 문장을 생성해야 해. "${userMessage}"라는 메세지에 대해 다음의 기준을 바탕으로 위로하는 말을 해줘.
 1. 명료화(validation)
   상대방의 감정을 읽어주는 것. 상대의 혼란스러운 감정을 같이 느끼고 있다는 것을 말로 확인해주는 것.
@@ -93,55 +96,44 @@ export default function Home() {
 3. 승인(affirmation)
   상대방을 확인, 지지해줌으로써 진정한 가치를 확인시켜줌
   ex) “그럼에도 불구하고, 당신은 소중한 존재입니다”, “이렇게 힘든 일을 겪었지만, 네가 내 옆에 있어줘서 고맙다`;
-    
-  const response = await fetch("/api/sentimentChat", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      messages: [...messages, { role: "user", content: comfortPrompts }],
-      // messages: [{ role: "system", content: comfortPrompts }, { role: "user", content: userMessage }],
-    }),
-  });
 
-  if (!response.ok) {
-    setLoading(false);
-    alert(`오류 발생: ${response.status} - ${response.statusText}`);
-    throw new Error(response.statusText);
-  }
-
-  const data = response.body;
-  console.log(data);
-
-  if (!data) {
-    return;
-  }
-
-  setLoading(false);
-
-  const reader = data.getReader();
-  const decoder = new TextDecoder();
-  let done = false;
-  let isFirst = true;
-  let comfortingMessage = '';
-
-  while (!done) {
-    const { value, done: doneReading } = await reader.read();
-    done = doneReading;
-    const chunkValue = decoder.decode(value);
-    comfortingMessage += chunkValue;
-
-    setMessages((messages) => [
-      ...messages,
-      {
-        role: "assistant",
-        content: chunkValue,  //chunkValue => messageToDisplay
+    const response = await fetch("/api/sentimentChat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    ]);
+      body: JSON.stringify({
+        messages: [...sentimentMessage, { role: "user", content: comfortPrompts }],
+      }),
+    });
+
+    if (!response.ok) {
+      setLoading(false);
+      alert(`오류 발생: ${response.status} - ${response.statusText}`);
+      throw new Error(response.statusText);
+    }
+
+    const data = response.body;
+    console.log(data);
+
+    if (!data) {
+      return;
+    }
+
+    const reader = data.getReader();
+    const decoder = new TextDecoder();
+    let done = false;
+    let isFirst = true;
+    let comfortingMessage = "";
+
+    while (!done) {
+      const { value, done: doneReading } = await reader.read();
+      done = doneReading;
+      const chunkValue = decoder.decode(value);
+      comfortingMessage += chunkValue;
+    }
+    return comfortingMessage;
   };
-  return comfortingMessage;
-  }
 
   //press send button
   const handleSend = async (message: Message) => {
@@ -151,29 +143,28 @@ export default function Home() {
     setLoading(true);
 
     //Call CLOVA API
-    // try {
-    //   const clovaResponse = await callCLOVAAPI(message.content);
-    //   console.log(clovaResponse);
+    try {
+      const clovaResponse = await callCLOVAAPI(message.content);
+      console.log(clovaResponse);
 
-    //   if (clovaResponse.comfortMessage) {
-    //     setMessages((messages) => [
-    //       ...messages,
-    //       { role: "assistant", content: clovaResponse.comfortMessage }
-    //     ]);
-    //   }
+      setLoading(false);
 
-    //   setMessages(updatedMessages);
-    //   setLoading(false);
-    // } catch (error) {
-    //   setLoading(false);
-    //   if (error instanceof Error) {
-    //     alert(`오류 발생: ${error.message}`);
-    //   } else {
-    //     alert("알 수 없는 오류 발생");
-    //   }
-    // }
+      if (clovaResponse.comfortMessage) {
+        setSentimentMessage((message) => [
+          ...message,
+          { role: "assistant", content: clovaResponse.comfortMessage },
+        ]);
+      }
+    } catch (error) {
+      setLoading(false);
+      if (error instanceof Error) {
+        alert(`오류 발생: ${error.message}`);
+      } else {
+        alert("알 수 없는 오류 발생");
+      }
+    }
+    setLoading(true);
 
-    
     //sending message to GPT
     const response = await fetch("/api/chat", {
       method: "POST",
@@ -201,9 +192,7 @@ export default function Home() {
     const decoder = new TextDecoder();
     let done = false;
     let isFirst = true;
-    let allContent = '';
-    
-    setCount((prev)=> prev + 1);
+    let allContent = "";
 
     while (!done) {
       const { value, done: doneReading } = await reader.read();
@@ -212,33 +201,55 @@ export default function Home() {
 
       // Save all content until done
       allContent += chunkValue;
-      console.log(allContent);
 
-      if (done) {  // if doneReading is true
-        const feedbackMatch = allContent.match(/피드백: (.*)\n/);
-        const feedback = feedbackMatch ? feedbackMatch[1] : undefined;
-    
-        const scoreMatch = allContent.match(/점수: (\d+)점/);
-        const score = scoreMatch ? Number(scoreMatch[1]) : undefined;
-    
-        const nextQuestionMatch = allContent.match(/다음 질문: (.*)/);
-        const nextQuestion = nextQuestionMatch ? nextQuestionMatch[1] : undefined;
+      if (done) {
+        // if doneReading is true
+        if (allContent.startsWith("피드백:")) {
+          const feedbackMatch = allContent.match(/피드백: (.*)\n/);
+          const feedback = feedbackMatch ? feedbackMatch[1] : undefined;
 
-        console.log(feedbackMatch);
-        console.log(scoreMatch);
-        console.log(nextQuestionMatch);
-    
-        if(score !== undefined) {
-          setTotalScore((prevTotal: number) => prevTotal + score);
+          const scoreMatch = allContent.match(/점수: (\d+)점/);
+          const score = scoreMatch ? Number(scoreMatch[1]) : undefined;
+
+          const nextQuestionMatch = allContent.match(/다음 질문: (.*)/);
+          const nextQuestion = nextQuestionMatch
+            ? nextQuestionMatch[1]
+            : undefined;
+
+          console.log(feedbackMatch);
+          console.log(scoreMatch);
+          console.log(nextQuestionMatch);
+
+          if(score !== undefined) {
+            setTotalScore((prevTotal: number) => prevTotal + score);
+            setCount((prevCount: number) => prevCount + 1);
+            console.log("왤케 많은겨"+count + "회까지 총점수: "+ totalScore);
+          }
+          setLoading(false);
+          setMessages((messages) => [
+            ...messages,
+            {
+              role: "assistant",
+              content: `${feedback} 점수는 ${score}점이네요.\n다음 질문입니다. ${nextQuestion}`,
+            },
+          ]);
+        } else {
+          const scoreMatch = allContent.match(/점수는 (\d+)점/);
+          const score = scoreMatch ? Number(scoreMatch[1]) : undefined;
+          if (score !== undefined) {
+            setTotalScore((prevTotal: number) => prevTotal + score);
+            setCount((prevCount: number) => prevCount + 1);
+          }
+
+          setLoading(false);
+          setMessages((messages) => [
+            ...messages,
+            {
+              role: "assistant",
+              content: allContent,
+            },
+          ]);
         }
-        setLoading(false);
-        setMessages((messages) => [
-          ...messages,
-          {
-            role: "assistant",
-            content: `${feedback} 다음 질문입니다. ${nextQuestion}`,
-          },
-        ]);
       }
 
       // if (isFirst) {
@@ -261,6 +272,7 @@ export default function Home() {
       //   });
       // }
     }
+    console.log(count + "회까지 총점수: "+ totalScore);
   };
 
   //press Start button
@@ -269,7 +281,6 @@ export default function Home() {
     setLoading(true);
 
     const updatedStartPrompt = [...messages, { role: "user", content: prompt }];
-
 
     const response = await fetch("/api/chat", {
       method: "POST",
@@ -294,7 +305,7 @@ export default function Home() {
       {
         role: "user",
         content: prompt,
-      }
+      },
     ]);
 
     if (!data) {
@@ -335,6 +346,92 @@ export default function Home() {
     }
   };
 
+  //press finish button
+  const handleFinish = async () => {
+    setLoading(true);
+
+    let allContent = "";
+    let conclusionprompt = "";
+    
+    if (totalScore <= 51) {
+      conclusionprompt = "낮은 불안 수준에 대한 조언을 알려줘. ->\n\n###\n\n";
+    } else if (totalScore <= 56) {
+      conclusionprompt = "약간 높은 불안 수준에 대한 조언을 알려줘. ->\n\n###\n\n";
+    } else if (totalScore <= 61) {
+      conclusionprompt = "높은 불안 수준에 대한 조언을 알려줘. ->\n\n###\n\n";
+    } else {
+      conclusionprompt = "매우 높은 불안 수준에 대한 조언을 알려줘. ->\n\n###\n\n";
+    }
+    console.log(conclusionprompt);
+
+    const response = await fetch("/api/conclusion", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prompt: conclusionprompt,
+      }),
+    });
+
+    if (!response.ok) {
+      setLoading(false);
+      alert(`오류 발생: ${response.status} - ${response.statusText}`);
+      throw new Error(response.statusText);
+    }
+
+    const data = response.body;
+
+    if (!data) {
+      return;
+    }
+
+    const reader = data.getReader();
+    const decoder = new TextDecoder();
+    let done = false;
+    let isFirst = true;
+
+    while (!done) {
+      const { value, done: doneReading } = await reader.read();
+      done = doneReading;
+      let chunkValue = decoder.decode(value);
+      allContent += chunkValue;
+      
+      
+      if(done){
+        allContent = allContent.replace(/\n/g, '<br/>');
+        setLoading(false);
+          setMessages((messages) => [
+            ...messages,
+            {
+              role: "assistant",
+              content: allContent,
+            },
+          ]);
+      }
+
+      // if (isFirst) {
+      //   isFirst = false;
+      //   setConclusionMesssage((messages) => [
+      //     ...messages,
+      //     {
+      //       role: "assistant",
+      //       content: chunkValue,
+      //     },
+      //   ]);
+      // } else {
+      //   setConclusionMesssage((messages) => {
+      //     const lastMessage = messages[messages.length - 1];
+      //     const updatedMessage = {
+      //       ...lastMessage,
+      //       content: lastMessage.content + chunkValue,
+      //     };
+      //     return [...messages.slice(0, -1), updatedMessage];
+      //   });
+      // }
+    }
+  };
+
   const handleReset = () => {
     setMessages([
       {
@@ -347,6 +444,10 @@ export default function Home() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [sentimentMessage]);
 
   useEffect(() => {
     setMessages([
@@ -410,7 +511,9 @@ export default function Home() {
         <div className="flex-1 overflow-auto sm:px-10 pb-4 sm:pb-10">
           <div className="max-w-[800px] mx-auto mt-4 sm:mt-12">
             <Chat
+              sentimentMessage={sentimentMessage}
               messages={messages}
+              conclusionMessage={conclusionMessage}
               loading={loading}
               onSend={handleSend}
               onReset={handleReset}
@@ -422,6 +525,14 @@ export default function Home() {
             >
               시작하기
             </button>
+            <div className="flex">
+            <button
+              onClick={handleFinish}
+              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded  ml-auto"
+            >
+              결과보기
+            </button>
+            </div>
             <div ref={messagesEndRef} />
             {/* <React.Fragment>
               <h1>지도</h1>
